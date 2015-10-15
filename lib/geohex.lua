@@ -10,7 +10,7 @@ local atan  = math.atan
 local PI    = math.pi
 
 -- Module definition
-module(...)
+local M = {}
 
 -- Constants
 local H_chars = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"}
@@ -67,10 +67,31 @@ local northing = function(lat)
   return log10(tan((90 + lat) * H_d2r / 2)) / PI * H_base
 end
 
+-- @return [table] parsed unif for given
+local
+function _unit(level)
+  level = tonumber(level) or 8
+
+  if not H_units[level] then
+    local size   = H_base / 3^(level+3)
+    local scale  = size / H_er
+    local width  = 6 * size
+    local height = width * H_k
+    H_units[level] = {
+      ["level"] = level, ["size"] = size, ["width"] = width, ["height"] = height, ["scale"] = scale
+    }
+  end
+
+  return H_units[level]
+end
+M.unit = _unit
+
+
 -- Converts `lat`, `lon`, `level` inputs to Points
 -- @return [table] point record containing { x = INT, y = INT, unit = TABLE }
-function point(lat, lon, level)
-  local u = unit(level)
+local
+function _point(lat, lon, level)
+  local u = _unit(level)
   local e = easting(lon)
   local n = northing(lat)
   local x = (e + n / H_k) / u.width
@@ -90,27 +111,12 @@ function point(lat, lon, level)
 
   return { ["x"] = xn, ["y"] = yn, ["unit"] = u }
 end
+M.point = _point
 
-
--- @return [table] parsed unif for given
-function unit(level)
-  level = tonumber(level) or 8
-
-  if not H_units[level] then
-    local size   = H_base / 3^(level+3)
-    local scale  = size / H_er
-    local width  = 6 * size
-    local height = width * H_k
-    H_units[level] = {
-      ["level"] = level, ["size"] = size, ["width"] = width, ["height"] = height, ["scale"] = scale
-    }
-  end
-
-  return H_units[level]
-end
 
 -- @return [table] point record containing { x = INT, y = INT, unit = TABLE }
-function parse(code)
+local
+function _parse(code)
   if type(code) ~= "string" then return nil end
 
   local x, y   = 0, 0
@@ -138,13 +144,16 @@ function parse(code)
     if yd == 0 then y = y - pow elseif yd == 2 then y = y + pow end
   end
 
-  return { ["x"] = x, ["y"] = y, ["unit"] = unit(len-2) }
+  return { ["x"] = x, ["y"] = y, ["unit"] = _unit(len-2) }
 end
+M.parse = _parse
+
 
 -- @see `point/3` function for arguments
 -- @return [string] encoded GeoHex string.
-function encode(...)
-  local point    = point(...)
+local
+function _encode(...)
+  local point    = _point(...)
   local ne       = point_to_ne(point)
   local code     = ""
   local mod_x, mod_y
@@ -190,11 +199,14 @@ function encode(...)
          H_chars[floor(num % 30) + 1] ..
          code:sub(4)
 end
+M.encode = _encode
+
 
 -- @see `parse/1` function for arguments
 -- @return [table] record containing { lat = FLOAT, lon = FLOAT, level = INT }
-function decode(...)
-  local point = parse(...)
+local
+function _decode(...)
+  local point = _parse(...)
   if not point then
     return nil
   end
@@ -212,5 +224,6 @@ function decode(...)
 
   return { ["lat"] = lat, ["lon"] = lon, ["level"] = point.unit.level }
 end
+M.decode = _decode
 
 return M
